@@ -1,0 +1,171 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    if: ${{ github.event_name == 'pull_request' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        command:
+          - clippy
+          - fmt
+          - test
+        include:
+          - command: clippy
+            args: '--workspace --all-targets --locked -- -D warnings'
+          - command: fmt
+            args: '--all --check'
+          - command: test
+            args: '--workspace --locked'
+    name: Test on Rust Toolchain nightly-2022-09-25 ( ${{ matrix.command }} )
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+        with:
+          fetch-depth: 0
+      - name: Set Up Rust
+        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af
+        with:
+          profile: minimal
+          toolchain: nightly-2022-09-25
+          components: clippy, rustfmt
+          target: wasm32-unknown-unknown
+          override: true
+          default: true
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@6720f05bc48b77f96918929a9019fb2203ff71f8
+      - name: Run cargo ${{ matrix.command }}
+        uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
+        with:
+          command: ${{ matrix.command }}
+          args: ${{ matrix.args }}
+
+  build:
+    if: ${{ github.event_name == 'push' && github.ref_type == 'branch' }}
+    runs-on: ubuntu-20.04
+    name: Build
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+        with:
+          fetch-depth: 0
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@8b122486cedac8393e77aa9734c3528886e4a1a8
+      - name: Set Up Docker Buildx
+        id: set-up-buildx
+        uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6
+        with:
+          install: true
+      - name: Cache Docker Layers
+        uses: actions/cache@56461b9eb0f8438fd15c7a9968e3c9ebb18ceff1
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Build Docker
+        uses: docker/build-push-action@c84f38281176d4c9cdb1626ffafcd6b3911b5d94
+        with:
+          builder: ${{ steps.set-up-buildx.outputs.name }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+          context: .
+          file: .maintain/docker/Dockerfile
+          tags: ${{ github.repository }}:${{ github.sha }}
+          outputs: type=docker,dest=/tmp/docker_image.tar
+      - name: Move Cache Docker Layers
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+      - name: Copy Binary from Docker Image
+        run: |
+          docker load --input /tmp/docker_image.tar
+          docker images --no-trunc --digests ${{ github.repository }}
+          id=$(docker create ${{ github.repository }}:${{ github.sha }})
+          docker cp $id:/usr/local/bin/myriad - > /tmp/myriad
+          docker cp $id:/home/myriad/myriad_runtime.compact.compressed.wasm - > /tmp/myriad_runtime.compact.compressed.wasm
+          docker rm -v $id
+      - name: Upload Build to Artifact
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8
+        with:
+          name: build_${{ github.sha }}
+          path: |
+            /tmp/docker_image.tar
+            /tmp/myriad
+            /tmp/myriad_runtime.compact.compressed.wasm
+          retention-days: 5
+
+  release-please:
+    needs:
+      - build
+    runs-on: ubuntu-20.04
+    name: Release Please
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+        with:
+          fetch-depth: 0
+      - name: Download Build from Artifact
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741
+        with:
+          name: build_${{ github.sha }}
+          path: /tmp
+      - name: Release
+        id: release
+        uses: google-github-actions/release-please-action@069d7229d7b10308de85bc606a91e0033e259c8e
+        with:
+          token: ${{ secrets.PAT }}
+          fork: true
+          release-type: node
+          package-name: ${{ github.event.repository.name }}
+          include-v-in-tag: false
+          extra-files: |
+            /tmp/myriad
+            /tmp/myriad_runtime.compact.compressed.wasm
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+
+  publish-docker:
+    needs:
+      - release-please
+    runs-on: ubuntu-20.04
+    name: Publish Docker
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Download Build from Artifact
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741
+        with:
+          name: build_${{ github.sha }}
+          path: /tmp
+      - name: Load Image
+        run: |
+          docker load --input /tmp/docker_image.tar
+          docker images --no-trunc --digests ${{ github.repository }}
+      - name: Tag as Release Version
+        if: ${{ needs.release-please.outputs.release_created }}
+        run: |
+          docker tag ${{ github.repository }}:${{ github.sha }} ${{ github.repository }}:${{ needs.release-please.outputs.tag_name }}
+          docker tag ${{ github.repository }}:${{ github.sha }} ${{ github.repository }}:latest
+          docker images --no-trunc --digests ${{ github.repository }}
+      - name: Push
+        run: docker image push -a ${{ github.repository }}
