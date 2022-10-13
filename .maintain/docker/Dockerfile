@@ -33,7 +33,7 @@ COPY ./pallets /app/pallets
 COPY ./runtime /app/runtime
 COPY ./Cargo.lock /app/Cargo.lock
 COPY ./Cargo.toml /app/Cargo.toml
-RUN cargo build --release --locked
+RUN cargo build --release
 
 FROM debian:bullseye-slim@sha256:8b702518a671c926b5ece4efe386a476eb4777646a36d996d4bd50944f2f11a2 AS runner
 LABEL social.myriad.image.authors="dev@myriad.social"
