@@ -3,8 +3,12 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       git \
-      make \
       clang \
+      libssl-dev \
+      llvm \
+      libudev-dev \
+      make \
+      protobuf-compiler \
       ; \
     rm -rf /var/lib/apt/lists/*; \
     rustup install nightly-2022-09-25; \
