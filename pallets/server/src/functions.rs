@@ -23,7 +23,7 @@ impl<T: Config> Pallet<T> {
 				let updated_server = match data {
 					ServerDataKind::Owner(new_owner) => server.clone().set_owner(new_owner),
 					ServerDataKind::ApiUrl(new_url) => {
-						ServerByApiUrl::<T>::swap(server.get_api_url(), &new_url);
+						ServerByApiUrl::<T>::swap(server.get_api_url(), new_url);
 						server.clone().set_api_url(new_url)
 					},
 				};
