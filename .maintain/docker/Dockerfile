@@ -11,13 +11,12 @@ RUN set -eux; \
       protobuf-compiler \
       ; \
     rm -rf /var/lib/apt/lists/*; \
-    rustup install nightly-2022-09-25; \
-    rustup target add wasm32-unknown-unknown --toolchain nightly-2022-09-25; \
+    rustup install nightly; \
+    rustup target add wasm32-unknown-unknown --toolchain nightly; \
     cargo install cargo-chef --version 0.1.45;
 WORKDIR /app
 
 FROM chef AS planner
-ENV WASM_BUILD_TOOLCHAIN=nightly-2022-09-25
 COPY ./node /app/node
 COPY ./pallets /app/pallets
 COPY ./runtime /app/runtime
@@ -26,7 +25,6 @@ COPY ./Cargo.toml /app/Cargo.toml
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
-ENV WASM_BUILD_TOOLCHAIN=nightly-2022-09-25
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY ./node /app/node
