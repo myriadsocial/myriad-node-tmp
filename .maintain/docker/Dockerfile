@@ -4,6 +4,7 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends \
       git \
       clang \
+      curl \
       libssl-dev \
       llvm \
       libudev-dev \
@@ -35,7 +36,7 @@ COPY ./Cargo.toml /app/Cargo.toml
 RUN cargo build --release --locked
 
 FROM debian:bullseye-slim@sha256:8b702518a671c926b5ece4efe386a476eb4777646a36d996d4bd50944f2f11a2 AS runner
-LABEL social.myriad.image.authors="devops@myriad.social"
+LABEL social.myriad.image.authors="dev@myriad.social"
 # Create user and set ownership and permissions as required
 RUN useradd -m -u 1001 -U -s /bin/sh -d /home/myriad myriad && \
   # manage folder data
@@ -49,7 +50,7 @@ COPY --from=builder /app/target/wbuild/myriad-runtime/myriad_runtime.compact.com
 # Set to a non-root built-in user
 USER myriad
 # check if executable works in this container
-RUN /usr/local/bin/debio --version
+RUN /usr/local/bin/myriad --version
 # Set environment variable
 ENV RUST_BACKTRACE=1
 EXPOSE 30333 9933 9944 9615
