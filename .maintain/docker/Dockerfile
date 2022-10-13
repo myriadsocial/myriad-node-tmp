@@ -1,7 +1,10 @@
 FROM rust:1.64.0-slim-bullseye@sha256:8c50afd6d977e7770d190103df9877ed7a9200a3625dbeebaa9ffad76359d822 AS chef
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends make;\
+    apt-get install -y --no-install-recommends \
+      make \
+      clang \
+      ; \
     rm -rf /var/lib/apt/lists/*; \
     rustup install nightly-2022-09-25; \
     rustup target add wasm32-unknown-unknown --toolchain nightly-2022-09-25; \
