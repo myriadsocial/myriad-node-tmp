@@ -2,6 +2,7 @@ FROM rust:1.64.0-slim-bullseye@sha256:8c50afd6d977e7770d190103df9877ed7a9200a362
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
+      git \
       make \
       clang \
       ; \
