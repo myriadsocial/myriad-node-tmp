@@ -2,6 +2,7 @@ FROM rust:1.64.0-bullseye@sha256:8c50afd6d977e7770d190103df9877ed7a9200a3625dbee
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
+      build-essential \
       git \
       clang \
       curl \
