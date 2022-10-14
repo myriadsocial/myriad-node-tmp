@@ -40,16 +40,16 @@ RUN cargo build --release --locked
 
 FROM debian:bullseye-slim@sha256:8b702518a671c926b5ece4efe386a476eb4777646a36d996d4bd50944f2f11a2 AS runner
 LABEL social.myriad.image.authors="dev@myriad.social"
-COPY --from=builder /myriad/target/release/myriad /usr/local/bin
-COPY --from=builder /myriad/target/release/wbuild/myriad-runtime/myriad_runtime.compact.compressed.wasm /myriad
 RUN useradd -m -u 1001 -U -s /bin/sh -d /myriad myriad && \
   mkdir -p /data /myriad/.local/share && \
   chown -R myriad:myriad /data && \
-  ln -s /data /myriad/.local/share/myriad && \
-  # unclutter and minimize the attack surface
-	rm -rf /usr/bin /usr/sbin && \
-  # check if executable works in this container
-	/usr/local/bin/myriad --version
+  ln -s /data /myriad/.local/share/myriad
+COPY --from=builder /myriad/target/release/myriad /usr/local/bin
+COPY --from=builder /myriad/target/release/wbuild/myriad-runtime/myriad_runtime.compact.compressed.wasm /myriad
+# unclutter and minimize the attack surface
+RUN rm -rf /usr/bin /usr/sbin
+# check if executable works in this container
+RUN /usr/local/bin/myriad --version
 USER myriad
 EXPOSE 30333 9933 9944 9615
 VOLUME ["/data"]
