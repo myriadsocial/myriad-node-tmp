@@ -99,7 +99,7 @@ jobs:
           docker images --no-trunc --digests ${{ github.repository }}
           id=$(docker create ${{ github.repository }}:${{ github.sha }})
           docker cp $id:/usr/local/bin/myriad - > /tmp/myriad
-          docker cp $id:/home/myriad/myriad_runtime.compact.compressed.wasm - > /tmp/myriad_runtime.compact.compressed.wasm
+          docker cp $id:/myriad/myriad_runtime.compact.compressed.wasm - > /tmp/myriad_runtime.compact.compressed.wasm
           docker rm -v $id
       - name: Upload Build to Artifact
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8
