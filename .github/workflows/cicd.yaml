@@ -49,7 +49,7 @@ jobs:
           override: true
           default: true
       - name: Cache Rust
-        uses: Swatinem/rust-cache@6720f05bc48b77f96918929a9019fb2203ff71f8
+        uses: Swatinem/rust-cache@b894d59a8d236e2979b247b80dac8d053ab340dd
       - name: Run cargo ${{ matrix.command }}
         uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505
         with:
